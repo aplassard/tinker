@@ -44,6 +44,7 @@ function App() {
       {/* Breathing circle */}
       <BreathingCircle
         phase={timer.phase}
+        prevPhase={timer.prevPhase}
         phaseProgress={timer.phaseProgress}
         isActive={timer.sessionState === "running"}
       />

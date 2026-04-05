@@ -7,6 +7,7 @@ export type SessionState = "idle" | "running" | "paused" | "complete";
 export function useBreathingTimer(durationMinutes: number, pattern: BreathPattern) {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [phase, setPhase] = useState<BreathPhase>("inhale");
+  const [prevPhase, setPrevPhase] = useState<BreathPhase>("inhale");
   const [phaseProgress, setPhaseProgress] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
 
@@ -36,7 +37,9 @@ export function useBreathingTimer(durationMinutes: number, pattern: BreathPatter
       setElapsedMs(sessionElapsed);
 
       if (phaseElapsed >= phaseDuration) {
+        const prevStep = pattern.steps[phaseIndexRef.current];
         phaseIndexRef.current = (phaseIndexRef.current + 1) % pattern.steps.length;
+        setPrevPhase(prevStep.phase);
         setPhase(pattern.steps[phaseIndexRef.current].phase);
         phaseStartRef.current = now;
         pausedPhaseElapsedRef.current = 0;
@@ -105,6 +108,7 @@ export function useBreathingTimer(durationMinutes: number, pattern: BreathPatter
   return {
     sessionState,
     phase,
+    prevPhase,
     phaseProgress,
     elapsedMs,
     totalMs,

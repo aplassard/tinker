@@ -2,6 +2,7 @@ import type { BreathPhase } from "../patterns";
 
 interface Props {
   phase: BreathPhase;
+  prevPhase: BreathPhase;
   phaseProgress: number;
   isActive: boolean;
 }
@@ -12,31 +13,32 @@ const PHASE_LABELS: Record<BreathPhase, string> = {
   exhale: "breathe out",
 };
 
-function getCircleScale(phase: BreathPhase, progress: number): number {
+function getCircleScale(phase: BreathPhase, prevPhase: BreathPhase, progress: number): number {
   switch (phase) {
     case "inhale":
       return 0.6 + 0.4 * progress;
     case "hold":
-      return 1;
+      // hold after exhale = contracted (0.6), hold after inhale = expanded (1.0)
+      return prevPhase === "exhale" ? 0.6 : 1;
     case "exhale":
       return 1 - 0.4 * progress;
   }
 }
 
-function getCircleOpacity(phase: BreathPhase, progress: number): number {
+function getCircleOpacity(phase: BreathPhase, prevPhase: BreathPhase, progress: number): number {
   switch (phase) {
     case "inhale":
       return 0.3 + 0.4 * progress;
     case "hold":
-      return 0.7;
+      return prevPhase === "exhale" ? 0.3 : 0.7;
     case "exhale":
       return 0.7 - 0.4 * progress;
   }
 }
 
-export default function BreathingCircle({ phase, phaseProgress, isActive }: Props) {
-  const scale = isActive ? getCircleScale(phase, phaseProgress) : 0.6;
-  const opacity = isActive ? getCircleOpacity(phase, phaseProgress) : 0.3;
+export default function BreathingCircle({ phase, prevPhase, phaseProgress, isActive }: Props) {
+  const scale = isActive ? getCircleScale(phase, prevPhase, phaseProgress) : 0.6;
+  const opacity = isActive ? getCircleOpacity(phase, prevPhase, phaseProgress) : 0.3;
 
   return (
     <div className="relative flex h-72 w-72 items-center justify-center sm:h-80 sm:w-80">
