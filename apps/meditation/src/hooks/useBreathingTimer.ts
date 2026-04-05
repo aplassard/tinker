@@ -1,14 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import type { BreathPhase, BreathPattern } from "../patterns";
 
-export type BreathPhase = "inhale" | "hold" | "exhale";
+export type { BreathPhase };
 export type SessionState = "idle" | "running" | "paused" | "complete";
 
-const PHASE_DURATION = 4000; // 4 seconds per phase
-const PHASES: BreathPhase[] = ["inhale", "hold", "exhale"];
-
-export function useBreathingTimer(durationMinutes: number) {
+export function useBreathingTimer(durationMinutes: number, pattern: BreathPattern) {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [phase, setPhase] = useState<BreathPhase>("inhale");
+  const [prevPhase, setPrevPhase] = useState<BreathPhase>("inhale");
   const [phaseProgress, setPhaseProgress] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
 
@@ -25,6 +24,8 @@ export function useBreathingTimer(durationMinutes: number) {
     (now: number) => {
       const sessionElapsed = pausedElapsedRef.current + (now - sessionStartRef.current);
       const phaseElapsed = pausedPhaseElapsedRef.current + (now - phaseStartRef.current);
+      const currentStep = pattern.steps[phaseIndexRef.current];
+      const phaseDuration = currentStep.duration;
 
       if (sessionElapsed >= totalMs) {
         setSessionState("complete");
@@ -35,26 +36,28 @@ export function useBreathingTimer(durationMinutes: number) {
 
       setElapsedMs(sessionElapsed);
 
-      if (phaseElapsed >= PHASE_DURATION) {
-        phaseIndexRef.current = (phaseIndexRef.current + 1) % PHASES.length;
-        setPhase(PHASES[phaseIndexRef.current]);
+      if (phaseElapsed >= phaseDuration) {
+        const prevStep = pattern.steps[phaseIndexRef.current];
+        phaseIndexRef.current = (phaseIndexRef.current + 1) % pattern.steps.length;
+        setPrevPhase(prevStep.phase);
+        setPhase(pattern.steps[phaseIndexRef.current].phase);
         phaseStartRef.current = now;
         pausedPhaseElapsedRef.current = 0;
         setPhaseProgress(0);
       } else {
-        setPhaseProgress(phaseElapsed / PHASE_DURATION);
+        setPhaseProgress(phaseElapsed / phaseDuration);
       }
 
       animFrameRef.current = requestAnimationFrame(tick);
     },
-    [totalMs],
+    [totalMs, pattern],
   );
 
   const start = useCallback(() => {
     const now = performance.now();
     if (sessionState === "idle" || sessionState === "complete") {
       phaseIndexRef.current = 0;
-      setPhase("inhale");
+      setPhase(pattern.steps[0].phase);
       setPhaseProgress(0);
       setElapsedMs(0);
       pausedElapsedRef.current = 0;
@@ -67,7 +70,7 @@ export function useBreathingTimer(durationMinutes: number) {
     }
     setSessionState("running");
     animFrameRef.current = requestAnimationFrame(tick);
-  }, [sessionState, tick]);
+  }, [sessionState, tick, pattern]);
 
   const pause = useCallback(() => {
     if (sessionState !== "running") return;
@@ -81,28 +84,31 @@ export function useBreathingTimer(durationMinutes: number) {
   const reset = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
     setSessionState("idle");
-    setPhase("inhale");
+    setPhase(pattern.steps[0].phase);
     setPhaseProgress(0);
     setElapsedMs(0);
     phaseIndexRef.current = 0;
     pausedElapsedRef.current = 0;
     pausedPhaseElapsedRef.current = 0;
-  }, []);
+  }, [pattern]);
 
   useEffect(() => {
     return () => cancelAnimationFrame(animFrameRef.current);
   }, []);
 
-  // Reset when duration changes while idle
+  // Reset when duration or pattern changes while idle
   useEffect(() => {
     if (sessionState === "idle") {
       setElapsedMs(0);
+      setPhase(pattern.steps[0].phase);
+      phaseIndexRef.current = 0;
     }
-  }, [durationMinutes, sessionState]);
+  }, [durationMinutes, pattern, sessionState]);
 
   return {
     sessionState,
     phase,
+    prevPhase,
     phaseProgress,
     elapsedMs,
     totalMs,
