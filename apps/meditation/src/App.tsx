@@ -3,30 +3,61 @@ import BreathingCircle from "./components/BreathingCircle";
 import Controls from "./components/Controls";
 import DurationSelector from "./components/DurationSelector";
 import PatternSelector from "./components/PatternSelector";
+import SoundscapeSelector from "./components/SoundscapeSelector";
 import StatsView from "./components/StatsView";
 import Timer from "./components/Timer";
 import { useBreathingTimer } from "./hooks/useBreathingTimer";
 import { useCompletionChime } from "./hooks/useCompletionChime";
 import { useSessionStorage } from "./hooks/useSessionStorage";
+import { useSoundscape, type SoundscapeId } from "./hooks/useSoundscape";
 import { PATTERNS } from "./patterns";
 
 function App() {
   const [duration, setDuration] = useState(5);
   const [pattern, setPattern] = useState(PATTERNS[0]);
   const [showStats, setShowStats] = useState(false);
+  const [soundscape, setSoundscape] = useState<SoundscapeId>("silent");
+  const [volume, setVolume] = useState(0.5);
   const timer = useBreathingTimer(duration, pattern);
   const playChime = useCompletionChime();
   const { sessions, recordSession, stats } = useSessionStorage();
+  const soundscapePlayer = useSoundscape();
   const prevStateRef = useRef(timer.sessionState);
 
-  // Play chime and record session when session completes
+  // Start/stop soundscape based on session state
+  useEffect(() => {
+    if (timer.sessionState === "running") {
+      soundscapePlayer.play(soundscape);
+    } else if (timer.sessionState === "paused") {
+      soundscapePlayer.stop();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timer.sessionState]);
+
+  // Play chime, fade out soundscape, and record session when session completes
   useEffect(() => {
     if (prevStateRef.current !== "complete" && timer.sessionState === "complete") {
       playChime();
+      soundscapePlayer.fadeOut(1500);
       recordSession(duration, pattern.id);
     }
     prevStateRef.current = timer.sessionState;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timer.sessionState, playChime, recordSession, duration, pattern.id]);
+
+  // Stop soundscape on reset
+  useEffect(() => {
+    if (timer.sessionState === "idle") {
+      soundscapePlayer.stop();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timer.sessionState]);
+
+  // Sync volume changes to active playback
+  useEffect(() => {
+    soundscapePlayer.setVolume(volume);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [volume]);
 
   const isActive = timer.sessionState === "running" || timer.sessionState === "paused";
 
@@ -54,6 +85,13 @@ function App() {
         <DurationSelector
           selected={duration}
           onChange={setDuration}
+          disabled={isActive}
+        />
+        <SoundscapeSelector
+          selected={soundscape}
+          volume={volume}
+          onChange={setSoundscape}
+          onVolumeChange={setVolume}
           disabled={isActive}
         />
       </div>
