@@ -1,4 +1,4 @@
-import type { BreathPhase } from "../hooks/useBreathingTimer";
+import type { BreathPhase } from "../patterns";
 
 interface Props {
   phase: BreathPhase;

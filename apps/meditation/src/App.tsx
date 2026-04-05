@@ -2,13 +2,16 @@ import { useState, useEffect, useRef } from "react";
 import BreathingCircle from "./components/BreathingCircle";
 import Controls from "./components/Controls";
 import DurationSelector from "./components/DurationSelector";
+import PatternSelector from "./components/PatternSelector";
 import Timer from "./components/Timer";
 import { useBreathingTimer } from "./hooks/useBreathingTimer";
 import { useCompletionChime } from "./hooks/useCompletionChime";
+import { PATTERNS } from "./patterns";
 
 function App() {
   const [duration, setDuration] = useState(5);
-  const timer = useBreathingTimer(duration);
+  const [pattern, setPattern] = useState(PATTERNS[0]);
+  const timer = useBreathingTimer(duration, pattern);
   const playChime = useCompletionChime();
   const prevStateRef = useRef(timer.sessionState);
 
@@ -23,9 +26,14 @@ function App() {
   const isActive = timer.sessionState === "running" || timer.sessionState === "paused";
 
   return (
-    <div className="flex min-h-screen select-none flex-col items-center justify-center gap-10 bg-slate-900 px-4">
-      {/* Duration selector - hidden during active session */}
-      <div className={`transition-opacity duration-500 ${isActive ? "pointer-events-none opacity-0" : "opacity-100"}`}>
+    <div className="flex min-h-screen select-none flex-col items-center justify-center gap-8 bg-slate-900 px-4">
+      {/* Pattern and duration selectors - hidden during active session */}
+      <div className={`flex flex-col items-center gap-6 transition-opacity duration-500 ${isActive ? "pointer-events-none opacity-0" : "opacity-100"}`}>
+        <PatternSelector
+          selected={pattern}
+          onChange={(p) => { setPattern(p); timer.reset(); }}
+          disabled={isActive}
+        />
         <DurationSelector
           selected={duration}
           onChange={setDuration}
