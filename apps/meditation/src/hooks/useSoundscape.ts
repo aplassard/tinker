@@ -21,6 +21,7 @@ interface SoundNodes {
   sources: (AudioBufferSourceNode | OscillatorNode)[];
   gains: GainNode[];
   masterGain: GainNode;
+  intervals?: ReturnType<typeof setInterval>[];
 }
 
 function createNoiseBuffer(ctx: AudioContext, seconds: number): AudioBuffer {
@@ -101,20 +102,21 @@ function startOcean(ctx: AudioContext, masterGain: GainNode): SoundNodes {
 function startForest(ctx: AudioContext, masterGain: GainNode): SoundNodes {
   const sources: (AudioBufferSourceNode | OscillatorNode)[] = [];
   const gains: GainNode[] = [];
+  const intervals: ReturnType<typeof setInterval>[] = [];
 
-  // Soft background wind/rustle
+  // Very soft background wind/rustle
   const noiseBuffer = createNoiseBuffer(ctx, 4);
   const windSource = ctx.createBufferSource();
   windSource.buffer = noiseBuffer;
   windSource.loop = true;
 
   const windFilter = ctx.createBiquadFilter();
-  windFilter.type = "bandpass";
-  windFilter.frequency.setValueAtTime(300, ctx.currentTime);
-  windFilter.Q.setValueAtTime(0.3, ctx.currentTime);
+  windFilter.type = "lowpass";
+  windFilter.frequency.setValueAtTime(250, ctx.currentTime);
+  windFilter.Q.setValueAtTime(0.2, ctx.currentTime);
 
   const windGain = ctx.createGain();
-  windGain.gain.setValueAtTime(0.15, ctx.currentTime);
+  windGain.gain.setValueAtTime(0.1, ctx.currentTime);
 
   windSource.connect(windFilter);
   windFilter.connect(windGain);
@@ -123,69 +125,108 @@ function startForest(ctx: AudioContext, masterGain: GainNode): SoundNodes {
   sources.push(windSource);
   gains.push(windGain);
 
-  // Bird-like chirps using modulated sine waves
-  const birdFreqs = [1200, 1800, 2400, 1500, 2000];
-  birdFreqs.forEach((freq, i) => {
+  // Gentle bird chirps that fade in and out sporadically
+  function scheduleBird() {
+    const freq = 1600 + Math.random() * 1200; // 1600-2800 Hz
     const osc = ctx.createOscillator();
     osc.type = "sine";
     osc.frequency.setValueAtTime(freq, ctx.currentTime);
-
-    // AM modulation for chirp pattern
-    const am = ctx.createOscillator();
-    const amGain = ctx.createGain();
-    am.type = "sine";
-    am.frequency.setValueAtTime(3 + i * 1.3, ctx.currentTime); // different chirp rates
-    amGain.gain.setValueAtTime(1, ctx.currentTime);
-    am.connect(amGain);
+    // Gentle downward frequency sweep for natural chirp
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.7, ctx.currentTime + 0.15);
 
     const birdGain = ctx.createGain();
     birdGain.gain.setValueAtTime(0, ctx.currentTime);
-    amGain.connect(birdGain.gain);
+    birdGain.gain.linearRampToValueAtTime(0.04 + Math.random() * 0.03, ctx.currentTime + 0.02);
+    birdGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
 
     osc.connect(birdGain);
     birdGain.connect(masterGain);
-
     osc.start();
-    am.start();
-    sources.push(osc, am);
-    gains.push(birdGain);
-  });
+    osc.stop(ctx.currentTime + 0.2);
+  }
 
-  return { sources, gains, masterGain };
+  // Schedule birds at random intervals (every 2-6 seconds)
+  const birdInterval = setInterval(() => {
+    if (ctx.state === "running") {
+      scheduleBird();
+      // Occasionally add a second chirp right after
+      if (Math.random() > 0.5) {
+        setTimeout(() => { if (ctx.state === "running") scheduleBird(); }, 120);
+      }
+    }
+  }, 2000 + Math.random() * 4000);
+  intervals.push(birdInterval);
+
+  // Re-randomize the bird interval periodically
+  const rerollInterval = setInterval(() => {
+    clearInterval(birdInterval);
+    const newInterval = setInterval(() => {
+      if (ctx.state === "running") {
+        scheduleBird();
+        if (Math.random() > 0.6) {
+          setTimeout(() => { if (ctx.state === "running") scheduleBird(); }, 100 + Math.random() * 80);
+        }
+      }
+    }, 2500 + Math.random() * 4500);
+    intervals.push(newInterval);
+  }, 15000);
+  intervals.push(rerollInterval);
+
+  // Start with a chirp after a brief pause
+  setTimeout(() => { if (ctx.state === "running") scheduleBird(); }, 1500);
+
+  return { sources, gains, masterGain, intervals };
 }
 
 function startBowl(ctx: AudioContext, masterGain: GainNode): SoundNodes {
   const sources: OscillatorNode[] = [];
   const gains: GainNode[] = [];
+  const intervals: ReturnType<typeof setInterval>[] = [];
 
-  // Fundamental + harmonics for singing bowl
-  const fundamentals = [174, 348, 522]; // ~F3 + overtones
-  fundamentals.forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+  // Strike the bowl: fundamental + harmonics that swell and decay naturally
+  function strike() {
+    const fundamentals = [174, 348, 522]; // ~F3 + overtones
+    fundamentals.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
 
-    // Subtle vibrato
-    const vibrato = ctx.createOscillator();
-    const vibratoGain = ctx.createGain();
-    vibrato.type = "sine";
-    vibrato.frequency.setValueAtTime(4 + i, ctx.currentTime);
-    vibratoGain.gain.setValueAtTime(2, ctx.currentTime);
-    vibrato.connect(vibratoGain);
-    vibratoGain.connect(osc.frequency);
-    vibrato.start();
+      // Subtle vibrato for shimmer
+      const vibrato = ctx.createOscillator();
+      const vibratoGain = ctx.createGain();
+      vibrato.type = "sine";
+      vibrato.frequency.setValueAtTime(3 + i * 0.5, ctx.currentTime);
+      vibratoGain.gain.setValueAtTime(1.5, ctx.currentTime);
+      vibrato.connect(vibratoGain);
+      vibratoGain.connect(osc.frequency);
+      vibrato.start();
 
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.25 / (i + 1), ctx.currentTime);
+      const gain = ctx.createGain();
+      const amplitude = 0.3 / (i + 1);
+      // Quick attack, long natural decay
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(amplitude, ctx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(amplitude * 0.3, ctx.currentTime + 3);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 7);
 
-    osc.connect(gain);
-    gain.connect(masterGain);
-    osc.start();
-    sources.push(osc, vibrato);
-    gains.push(gain);
-  });
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start();
+      osc.stop(ctx.currentTime + 7.5);
+      vibrato.stop(ctx.currentTime + 7.5);
+    });
+  }
 
-  return { sources, gains, masterGain };
+  // Initial strike
+  strike();
+
+  // Repeat strike every 8 seconds (overlapping with the tail of the previous)
+  const strikeInterval = setInterval(() => {
+    if (ctx.state === "running") strike();
+  }, 8000);
+  intervals.push(strikeInterval);
+
+  return { sources, gains, masterGain, intervals };
 }
 
 function startWhiteNoise(ctx: AudioContext, masterGain: GainNode): SoundNodes {
@@ -235,6 +276,9 @@ export function useSoundscape() {
 
     const ctx = audioCtxRef.current;
     if (!ctx) return;
+
+    // Clear any scheduled intervals (bird chirps, bowl strikes)
+    nodes.intervals?.forEach((id) => clearInterval(id));
 
     const fadeSec = fadeMs / 1000;
     if (fadeSec > 0) {
