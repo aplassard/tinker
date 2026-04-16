@@ -1,24 +1,21 @@
+export type HandicapEstimate = "beginner" | "intermediate" | "advanced";
+
+export interface CategoryAnalysis {
+  score: number; // 1-10
+  tips: string[];
+}
+
 export interface SwingAnalysis {
   overall_score: number; // 1-10
-  summary: string;
-  phases: {
-    setup: PhaseAnalysis;
-    backswing: PhaseAnalysis;
-    downswing: PhaseAnalysis;
-    impact: PhaseAnalysis;
-    follow_through: PhaseAnalysis;
+  handicap_estimate: HandicapEstimate;
+  categories: {
+    grip: CategoryAnalysis;
+    stance: CategoryAnalysis;
+    backswing: CategoryAnalysis;
+    downswing: CategoryAnalysis;
+    follow_through: CategoryAnalysis;
   };
-  drills: Drill[];
-}
-
-export interface PhaseAnalysis {
-  score: number; // 1-10
-  feedback: string;
-}
-
-export interface Drill {
-  name: string;
-  description: string;
+  top_priority_fix: string;
 }
 
 export interface AnalyzeResponse {
