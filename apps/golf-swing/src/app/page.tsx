@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import type { SwingAnalysis } from "@/lib/types";
+import SwingFeedback from "@/components/SwingFeedback";
 
 const ACCEPTED_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
 const MAX_DURATION_S = 30;
@@ -16,6 +18,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [isValid, setIsValid] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [analysis, setAnalysis] = useState<SwingAnalysis | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -25,6 +28,7 @@ export default function HomePage() {
     setPreviewUrl(null);
     setError(null);
     setIsValid(false);
+    setAnalysis(null);
   }, [previewUrl]);
 
   const handleFileChange = useCallback(
@@ -75,9 +79,30 @@ export default function HomePage() {
   const handleSubmit = async () => {
     if (!file || !isValid) return;
     setIsSubmitting(true);
-    // TODO: API integration
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("video", file);
+
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Analysis failed. Please try again.");
+        return;
+      }
+
+      setAnalysis(data.analysis);
+    } catch {
+      setError("Network error. Please check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -163,14 +188,19 @@ export default function HomePage() {
         )}
 
         {/* Submit button */}
-        <button
-          type="button"
-          disabled={!isValid || isSubmitting}
-          onClick={handleSubmit}
-          className="w-full rounded-lg bg-green-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
-        >
-          {isSubmitting ? "Uploading…" : "Analyze Swing"}
-        </button>
+        {!analysis && (
+          <button
+            type="button"
+            disabled={!isValid || isSubmitting}
+            onClick={handleSubmit}
+            className="w-full rounded-lg bg-green-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
+          >
+            {isSubmitting ? "Analyzing…" : "Analyze Swing"}
+          </button>
+        )}
+
+        {/* Results */}
+        {analysis && <SwingFeedback analysis={analysis} />}
       </div>
     </main>
   );
